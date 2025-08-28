@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Formulário Cliente</title>
+
+    <!-- Bulma CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+
+<style>
+    .section {
+      background-color: #2c2c2c;
+      padding: 4rem 2rem;
+      min-height: 100vh;
+      display: flex;
+    }
+
+    .section-title {
+      text-align: center;
+      margin-bottom: 3rem;
+    }
+
+    .section-title h2 {
+      font-size: 3rem;
+      color: white;
+      text-shadow: 2px 2px 0 #000;
+    }
+</style>
+</head>
+<body style="background-color:#1a1a1a; color:white;">
+
+<section class="section">
+  <div class="container">
+    <h1 class="title has-text-centered" style="color:white;"><%= titulo %></h1>
+
+    <form action="<%= client ? '/clients/edit/' + client.id : '/clients/new' %>" method="POST" class="box">
+
+      <div class="field">
+        <label class="label">Cliente</label>
+        <div class="control">
+          <input class="input" type="text" name="Cliente" value="<%= client ? client.Cliente : '' %>" required>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="label">Código</label>
+        <div class="control">
+          <input class="input" type="text" name="Codigo" value="<%= client ? client.Codigo : '' %>">
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="label">Descrição</label>
+        <div class="control">
+          <textarea class="textarea" name="description"><%= client ? client.description : '' %></textarea>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="label">Linha de Base (horas)</label>
+        <div class="control">
+          <input class="input" type="number" name="Linha_de_base" value="<%= client ? client.Linha_de_base : '' %>" required>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="label">Horas Trabalhadas</label>
+        <div class="control">
+          <input class="input" type="number" name="Horas_trabalhadas" value="<%= client ? client.Horas_trabalhadas : 0 %>">
+        </div>
+      </div>
+
+      <div class="field has-text-centered">
+        <button class="button is-success" type="submit">Salvar</button>
+        <a href="/clients" class="button is-light">Cancelar</a>
+      </div>
+    </form>
+  </div>
+</section>
+
+</body>
+</html>

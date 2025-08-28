@@ -7,19 +7,13 @@
 
   <!-- Bulma CSS -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
-  <!-- Google Fonts -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Nata+Sans:wght@100..900&display=swap" rel="stylesheet">
 
   <style>
-    .section-4 {
+    .section {
       background-color: #2c2c2c;
       padding: 4rem 2rem;
       min-height: 100vh;
       display: flex;
-      flex-direction: column;
-      align-items: center;
     }
 
     .section-title {
@@ -31,60 +25,22 @@
       font-size: 3rem;
       color: white;
       text-shadow: 2px 2px 0 #000;
-      font-family: "Permanent Marker";
     }
-    .custom-purple {
-      background-color: #483d8b;
-      color: white;
-      border: none;
-    }
-
-    .custom-purple:hover {
-      background-color: #483d8b;
-      color: #eee;
-    }
-
-    .button.is-purple-1 {
-      background-color: #b39ddb;
-      color: white;
-      border: none;
-    }
-    .button.is-purple-1:hover {
-      background-color: #9575cd;
-    }
-
-    .button.is-purple-2 {
-      background-color: #7e57c2;
-      color: white;
-      border: none;
-    }
-    .button.is-purple-2:hover {
-      background-color: #673ab7;
-    }
-
-    .button.is-purple-3 {
-      background-color: #5e35b1;
-      color: white;
-      border: none;
-    }
-    .button.is-purple-3:hover {
-      background-color: #4527a0;
-    }
-
   </style>
 </head>
 <body style="background-color: #1a1a1a; color:white;">
 
-<section class="section-4">
+<section class="section">
   <div class="container">
     <div class="section-title">
-      <h2 >Pesquisar Tabela</h2>
+      <h2>Pesquisar Tabela</h2>
     </div>
 
     <% if (error) { %>
-      <p class="has-text-danger"><%= error %></p>
+      <p class="has-text-danger has-text-centered"><%= error %></p>
     <% } %>
 
+    <!-- Formulário de pesquisa -->
     <form action="/search" method="POST" style="max-width: 500px; margin: 0 auto;">
       <div class="field">
         <label style="color: #fff" class="label">Nome da Tabela</label>
@@ -98,8 +54,14 @@
         </div>
       </div>
     </form>
+
+    <!-- Botão para página de clientes -->
+    <div class="control" style="max-width: 500px; margin: 20px auto 0;">
+      <a href="/clients" class="button custom-purple is-fullwidth">Clientes</a>
+    </div>
   </div>
 </section>
 
 </body>
 </html>
+
