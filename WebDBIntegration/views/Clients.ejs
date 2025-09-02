@@ -4,63 +4,126 @@
   <meta charset="UTF-8">
   <title>Clientes</title>
 
-    <!-- Bulma CSS -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+  <!-- Bulma CSS -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Fonte Montserrat -->
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap" rel="stylesheet">
 
   <style>
+    body {
+      background: linear-gradient(135deg, #1a1a1a, #2b3236);
+      color: white;
+      font-family: 'Montserrat', sans-serif;
+    }
+
+    .section {
+      padding: 4rem 2rem;
+      min-height: 100vh;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+    }
+
+    .container {
+      background-color: rgba(43, 50, 54, 0.95);
+      border-radius: 12px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+      padding: 2rem;
+      width: 100%;
+      max-width: 1200px;
+    }
+
+    .title {
+      text-align: center;
+      margin-bottom: 2rem;
+      font-size: 2.5rem;
+      color: #fff;
+    }
+
+    .button.is-primary {
+      background-color: #a5c3d1;
+      border: none;
+    }
+
+    .button.is-primary:hover {
+      background-color: #637780;
+    }
+
+    .button.is-back {
+      background-color: #a5c3d1;
+      border: none;
+      color: white;
+    }
+
+    .button.is-back:hover {
+      background-color: #637780;
+    }
+
     .status-box {
       padding: 8px 12px;
-      border-radius: 6px;
-      color: white;
+      border-radius: 10px;
       font-weight: bold;
       text-align: center;
+      color: white;
     }
+
     .verde {
-      background-color: #2e7d32; /* verde */
+      background-color: #2e7d32;
     }
+
     .amarelo {
-      background-color: #f9a825; /* amarelo */
+      background-color: #f9a825;
       color: black;
     }
+
     .vermelho {
-      background-color: #c62828; /* vermelho */
+      background-color: #c62828;
     }
+
     .buttons form {
       display: inline;
     }
 
-    .section {
-      background-color: #2c2c2c;
-      padding: 4rem 2rem;
-      min-height: 100vh;
-      display: flex;
+    table {
+      background-color: rgba(255, 255, 255, 0.03);
+      border-radius: 8px;
+      overflow: hidden;
     }
 
-    .section-title {
-      text-align: center;
-      margin-bottom: 3rem;
+    th {
+      color: #000000;
+      background-color: rgba(255, 255, 255, 0.05);
     }
 
-    .section-title h2 {
-      font-size: 3rem;
-      color: white;
-      text-shadow: 2px 2px 0 #000;
+    td {
+      color: #000000;
     }
   </style>
 </head>
-<body style="background:#1a1a1a; color:white;">
+
+<body>
   <section class="section">
     <div class="container">
-      <h1 class="title has-text-white">Lista de Clientes</h1>
+      <h1 class="title">Lista de Clientes</h1>
 
-      <div style="margin-bottom: 20px;">
-        <a href="/clients/new" class="button is-primary">Adicionar Cliente</a>
+      <div style="margin-bottom: 20px; text-align: center;">
+        <a href="/" class="button is-back">
+          <i class="fa fa-chevron-left" aria-hidden="true"> Voltar</i>
+        </a>
+        <a href="/clients/new" class="button is-primary">
+          <i class="fas fa-user-plus"></i> Adicionar Cliente
+        </a>
       </div>
 
       <table class="table is-fullwidth is-striped">
         <thead>
           <tr>
             <th>Nome</th>
+            <th>Código</th>
+            <th>Data de Início</th>
+            <th>Data de Fim</th>
             <th>Horas Contratadas</th>
             <th>Horas Usadas</th>
             <th>Status</th>
@@ -76,6 +139,9 @@
           %>
             <tr>
               <td><%= cliente.Cliente %></td>
+              <td><%= cliente.Codigo %></td>
+              <td><%= cliente.Data_de_Inicio %></td>
+              <td><%= cliente.Data_de_Fim %></td>
               <td><%= cliente.Linha_de_base %></td>
               <td><%= cliente.Horas_trabalhadas %></td>
               <td>
@@ -90,9 +156,13 @@
                 </div>
               </td>
               <td class="buttons">
-                <a href="/clients/edit/<%= cliente.id %>" class="button is-warning is-small">Editar</a>
+                <a href="/clients/edit/<%= cliente.id %>" class="button is-warning is-small">
+                  <i class="fas fa-edit"></i> Editar
+                </a>
                 <form action="/clients/delete/<%= cliente.id %>" method="POST" onsubmit="return confirm('Deseja realmente excluir este cliente?');">
-                  <button type="submit" class="button is-danger is-small">Excluir</button>
+                  <button type="submit" class="button is-danger is-small">
+                    <i class="fas fa-trash-alt"></i> Excluir
+                  </button>
                 </form>
               </td>
             </tr>

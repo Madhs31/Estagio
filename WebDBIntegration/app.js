@@ -7,10 +7,10 @@ const port = 3000;
 
 // Conexão com o banco de dados
 const db = mysql.createConnection({
-  host: '',
-  user: '',
-  password: '',
-  database: ''
+  host: '192.168.70.209',
+  user: 'glpi',
+  password: 'por00t!@#',
+  database: 'glpi'
 });
 
 db.connect(err => {
@@ -39,23 +39,19 @@ app.post('/search', (req, res) => {
   const tableName = req.body.table;
   if (!tableName) return res.render('home', { error: 'Digite o nome da tabela.' });
 
-  // Verifica se a tabela existe
   db.query('SHOW TABLES LIKE ?', [tableName], (err, tableExists) => {
     if (err || tableExists.length === 0) {
       return res.render('home', { error: 'Tabela não encontrada.' });
     }
 
-    // Pega os dados da tabela (máximo 100 linhas)
     db.query(`SELECT * FROM ?? LIMIT 100`, [tableName], (err2, rows) => {
       if (err2) return res.render('home', { error: 'Erro ao buscar dados da tabela.' });
 
-      // Pega os nomes das colunas
       const columns = rows.length > 0 ? Object.keys(rows[0]) : [];
       res.render('projects', { titulo: `Tabela: ${tableName}`, columns, projects: rows });
     });
   });
 });
-
 
 // ==================== ROTAS CLIENTES ====================
 
@@ -63,7 +59,7 @@ app.post('/search', (req, res) => {
 app.get('/clients', (req, res) => {
   const sql = `
     SELECT 
-      id, Cliente, Codigo, description, Linha_de_base, Horas_trabalhadas,
+      id, Cliente, Codigo, Data_de_Inicio, Data_de_Fim, Linha_de_base, Horas_trabalhadas,
       ROUND((Horas_trabalhadas * 100.0) / Linha_de_base, 2) AS Percentual_usado,
       CASE
         WHEN (Horas_trabalhadas * 100.0) / Linha_de_base < 50 THEN 'verde'
@@ -86,14 +82,14 @@ app.get('/clients/new', (req, res) => {
   res.render('client_form', { titulo: 'Novo Cliente', client: null });
 });
 
-// Inserir cliente
+// Inserir cliente 
 app.post('/clients/new', (req, res) => {
-  const { Cliente, Codigo, description, Linha_de_base, Horas_trabalhadas } = req.body;
+  const { Cliente, Codigo, Data_de_Inicio, Data_de_Fim, Linha_de_base } = req.body;
   const sql = `
-    INSERT INTO opt_clientes (Cliente, Codigo, description, Linha_de_base, Horas_trabalhadas)
-    VALUES (?, ?, ?, ?, ?)
+    INSERT INTO opt_clientes (Cliente, Codigo, Data_de_Inicio, Data_de_Fim, Linha_de_base, Horas_trabalhadas)
+    VALUES (?, ?, ?, ?, ?, 0)
   `;
-  db.query(sql, [Cliente, Codigo, description, Linha_de_base, Horas_trabalhadas], (err) => {
+  db.query(sql, [Cliente, Codigo, Data_de_Inicio, Data_de_Fim, Linha_de_base], (err) => {
     if (err) {
       console.error(err);
       return res.send('Erro ao adicionar cliente');
@@ -113,16 +109,16 @@ app.get('/clients/edit/:id', (req, res) => {
   });
 });
 
-// Atualizar cliente
+// Atualizar cliente (não altera Horas_trabalhadas)
 app.post('/clients/edit/:id', (req, res) => {
   const { id } = req.params;
-  const { Cliente, Codigo, description, Linha_de_base, Horas_trabalhadas } = req.body;
+  const { Cliente, Codigo, Data_de_Inicio, Data_de_Fim, Linha_de_base } = req.body;
   const sql = `
     UPDATE opt_clientes
-    SET Cliente=?, Codigo=?, description=?, Linha_de_base=?, Horas_trabalhadas=?
+    SET Cliente=?, Codigo=?, Data_de_Inicio=?, Data_de_Fim=?, Linha_de_base=?
     WHERE id=?
   `;
-  db.query(sql, [Cliente, Codigo, description, Linha_de_base, Horas_trabalhadas, id], (err) => {
+  db.query(sql, [Cliente, Codigo, Data_de_Inicio, Data_de_Fim, Linha_de_base, id], (err) => {
     if (err) {
       console.error(err);
       return res.send('Erro ao atualizar cliente');
@@ -142,6 +138,7 @@ app.post('/clients/delete/:id', (req, res) => {
     res.redirect('/clients');
   });
 });
+
 // ==================== MIDDLEWARES ====================
 app.use((req, res) => res.status(404).send('Desculpe, página não encontrada.'));
 app.use((err, req, res, next) => {

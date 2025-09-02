@@ -7,51 +7,85 @@
 
   <!-- Bulma CSS -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Fonte Montserrat -->
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap" rel="stylesheet">
 
   <style>
-    .section-4 {
-      background-color: #2c2c2c;
+    body {
+      background: linear-gradient(135deg, #1a1a1a, #2b3236);
+      color: white;
+      font-family: 'Montserrat', sans-serif;
+    }
+
+    .section {
       padding: 4rem 2rem;
       min-height: 100vh;
       display: flex;
-      flex-direction: column;
-      align-items: center;
+      align-items: flex-start;
+      justify-content: center;
+    }
+
+    .container {
+      background-color: rgba(43, 50, 54, 0.95);
+      border-radius: 12px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+      padding: 2rem;
+      width: 100%;
+      max-width: 1200px;
     }
 
     .section-title {
       text-align: center;
-      margin-bottom: 3rem;
+      margin-bottom: 2.5rem;
     }
 
     .section-title h2 {
-      font-size: 3rem;
-      color: white;
+      font-size: 2.5rem;
+      color: #ffffff;
+      text-shadow: 1px 1px 2px #000;
     }
 
-    /* Responsividade da tabela */
-    .table-container {
-      width: 100%;
-      overflow-x: auto;   /* permite rolagem horizontal se precisar */
-      background: white;  /* fundo branco para destacar a tabela */
+    table {
+      background-color: rgba(255, 255, 255, 0.03);
       border-radius: 8px;
-      padding: 1rem;
-    }
-
-    table, th, td {
-      color: black !important;
-      text-align: center;
-      vertical-align: middle;
+      overflow: hidden;
     }
 
     th {
-      background-color: #f3f3f3;
+      color: #000000;
+      background-color: #a5c3d1;
     }
+
+    td {
+      color: #000000;
+    }
+
+    p {
+      text-align: center;
+      font-size: 1.2rem;
+      margin-top: 2rem;
+    }
+    .button.is-back {
+      background-color: #a5c3d1;
+      border: none;
+      color: white;
+    }
+
+    .button.is-back:hover {
+      background-color: #637780;
+    }
+
   </style>
 </head>
-<body style="background-color:#1a1a1a; color:white;">
+<body>
 
-<section class="section-4">
+<section class="section">
   <div class="container">
+    <a href="/" class="button is-back ">
+      <i class="fa fa-chevron-left"> Voltar</i>
+    </a>
     <div class="section-title">
       <h2><%= titulo %></h2>
     </div>
@@ -59,7 +93,7 @@
     <% if (projects.length === 0) { %>
       <p>Nenhum dado encontrado.</p>
     <% } else { %>
-      <div class="table-container">
+      <div>
         <table class="table is-striped is-fullwidth">
           <thead>
             <tr>
@@ -80,10 +114,8 @@
         </table>
       </div>
     <% } %>
-
   </div>
 </section>
 
 </body>
 </html>
-
