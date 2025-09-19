@@ -7,10 +7,10 @@ const port = 3000;
 
 // Conexão com o banco de dados
 const db = mysql.createConnection({
-  host: '192.168.70.209',
-  user: 'glpi',
-  password: 'por00t!@#',
-  database: 'glpi'
+  host: 
+  user: 
+  password: 
+  database: 
 });
 
 db.connect(err => {
@@ -136,6 +136,38 @@ app.post('/clients/delete/:id', (req, res) => {
       return res.send('Erro ao excluir cliente');
     }
     res.redirect('/clients');
+  });
+});
+
+// ==================== ROTAS DEMANDAS ====================
+
+// Listar Demandas
+app.get('/demands', (req, res) => {
+  const sql = `
+    SELECT
+      gu.name AS ANALISTA,
+      gt.name AS CLIENTE,
+      COUNT(gt.id) AS QTD,
+      ROUND(SUM(gt.actiontime) / 3600, 2) AS HH,
+      CONCAT(COUNT(gt.id), ' ', gt.name) AS \`LINHA DE BASE\`
+    FROM glpi.glpi_tickets gt
+    JOIN glpi.glpi_tickets_users gtu
+      ON gtu.tickets_id = gt.id
+      AND gtu.type = 2               
+    JOIN glpi.glpi_users gu
+      ON gu.id = gtu.users_id
+    WHERE gt.status <> 6
+      AND gt.is_deleted = 0
+    GROUP BY gu.name, gt.name
+    ORDER BY gu.name, gt.name;
+  `;
+
+  db.query(sql, (err, rows) => {
+    if (err) {
+      console.error(err);
+      return res.render('demands', { titulo: 'Demandas', error: 'Erro ao buscar demandas.', demands: [] });
+    }
+    res.render('demands', { titulo: 'Demandas', error: null, demands: rows });
   });
 });
 

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Tabelas</title>
+  <title>Demandas</title>
 
   <!-- Bulma CSS -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
@@ -78,29 +78,31 @@
       <h2><%= titulo %></h2>
     </div>
 
-    <% if (projects.length === 0) { %>
+    <% if (!demands || demands.length === 0) { %>
       <p>Nenhum dado encontrado.</p>
     <% } else { %>
-      <div>
-        <table class="table is-striped is-fullwidth">
-          <thead>
+      <table class="table is-striped is-fullwidth">
+        <thead>
+          <tr>
+            <th>Analista</th>
+            <th>Cliente</th>
+            <th>Qtd de Chamados</th>
+            <th>Horas Trabalhadas</th>
+            <th>Linha de Base</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% demands.forEach(demanda => { %>
             <tr>
-              <% columns.forEach(col => { %>
-                <th><%= col %></th>
-              <% }) %>
+              <td><%= demanda.ANALISTA %></td>
+              <td><%= demanda.CLIENTE %></td>
+              <td><%= demanda.QTD %></td>
+              <td><%= demanda.HH %></td>
+              <td><%= demanda['LINHA DE BASE'] %></td>
             </tr>
-          </thead>
-          <tbody>
-            <% projects.forEach(row => { %>
-              <tr>
-                <% columns.forEach(col => { %>
-                  <td><%= row[col] %></td>
-                <% }) %>
-              </tr>
-            <% }) %>
-          </tbody>
-        </table>
-      </div>
+          <% }) %>
+        </tbody>
+      </table>
     <% } %>
   </div>
 </section>

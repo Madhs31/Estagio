@@ -68,16 +68,6 @@
       background-color: #637780;
     }
 
-    .button.is-back {
-      background-color: #a5c3d1;
-      border: none;
-      color: white;
-    }
-
-    .button.is-back:hover {
-      background-color: #637780;
-    }
-
     .button.is-light {
       background-color: #444;
       color: white;
@@ -98,9 +88,6 @@
 <body>
   <section class="section">
     <div class="container">
-      <a href="/" class="button is-back">
-        <i class="fa fa-chevron-left"></i>&nbsp; Voltar
-      </a>
       <h1 class="title"><%= titulo %></h1>
 
       <form action="<%= client ? '/clients/edit/' + client.id : '/clients/new' %>" method="POST" class="box">
@@ -141,8 +128,6 @@
             <input class="input" type="number" name="Linha_de_base" value="<%= client ? client.Linha_de_base : '' %>" required>
           </div>
         </div>
-
-        <!-- Campo de Horas Trabalhadas REMOVIDO -->
 
         <div class="field has-text-centered">
           <button class="button is-success" type="submit">
