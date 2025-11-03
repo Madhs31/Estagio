@@ -20,6 +20,7 @@ if not API_KEY:
 _users_cache = {}
 
 def parse_month_to_range(month_input):
+    # Esta função não é mais usada pelo fluxo principal, mas foi mantida
     try:
         parts = month_input.strip().split('/')
         if len(parts) != 2:
@@ -56,6 +57,7 @@ def parse_month_to_range(month_input):
         return [start_str, end_str]
 
 def build_filters(date_range):
+    # Esta função não é mais usada pelo fluxo principal, mas foi mantida
     if not date_range or not date_range[0]:
         return None
     
@@ -81,6 +83,7 @@ def build_filters(date_range):
     return json.dumps(filtros_api)
 
 def get_work_packages(date_range, use_date_filter=True):
+    # Esta função não é usada pelo fluxo principal (get_work_packages_for_export)
     auth = ('apikey', API_KEY)
     url = f"{OPENPROJECT_URL}/work_packages"
 
@@ -201,19 +204,21 @@ def get_work_package_cost_entries(work_package_id):
         print(f"Erro ao buscar cost_entries para WP {work_package_id}: {e}")
         return None
 
-def get_time_entries_corrigido(date_range):
+def get_time_entries_corrigido():
 
-    #Função adicionada para buscar os dados corretos (lançamentos de tempo)  usando o filtro de data correto ('spentOn').
+    #Função adicionada para buscar os dados corretos (lançamentos de tempo) sem filtro de data.
     auth = ('apikey', API_KEY)
     url = f"{OPENPROJECT_URL}/time_entries"
     
-    filters = [{"spentOn": {"operator": "<>d", "values": date_range}}]
+    # REMOVIDO FILTRO DE DATA
+    # filters = [{"spentOn": {"operator": "<>d", "values": date_range}}]
     
-    params = {"pageSize": 500, "offset": 1, "filters": json.dumps(filters)}
+    # REMOVIDO "filters" DOS PARÂMETROS
+    params = {"pageSize": 500, "offset": 1} 
     headers = {'Content-Type': 'application/json'}
     all_entries = []
 
-    print("\nBuscando lançamentos de tempo (time entries)...")
+    print("\nBuscando TODOS os lançamentos de tempo (time entries)...")
     try:
         while True:
             params['offset'] = (len(all_entries) // params['pageSize']) + 1
@@ -238,7 +243,7 @@ def get_time_entries_corrigido(date_range):
         return []
 
 def get_work_package_details(wp_id):
-   
+    
     # Busca os detalhes completos de um work package específico, incluindo os custos.
     auth = ('apikey', API_KEY)
     url = f"{OPENPROJECT_URL}/work_packages/{wp_id}"
@@ -248,12 +253,16 @@ def get_work_package_details(wp_id):
         r.raise_for_status()  # Lança um erro para status HTTP 4xx/5xx
         return r.json()
     except requests.exceptions.RequestException as e:
-        print(f"  - Aviso: Não foi possível buscar detalhes para o WP ID {wp_id}. Erro: {e}")
+        # Silenciado o print para não poluir o console em caso de erro 404 (tarefa não encontrada)
+        # print(f"  - Aviso: Não foi possível buscar detalhes para o WP ID {wp_id}. Erro: {e}")
         return None
 
-def get_work_packages_for_export(date_range, use_date_filter=True):
-    # Esta é a chamada correta: busca os lançamentos de tempo no período.
-    raw_data_corrigida = get_time_entries_corrigido(date_range)
+# ==============================================================================
+# FUNÇÃO MODIFICADA COM CACHE E PRINT DE PROGRESSO
+# ==============================================================================
+def get_work_packages_for_export(): # REMOVIDOS ARGUMENTOS
+    # Esta é a chamada correta: busca os lançamentos de tempo (AGORA SEM FILTRO).
+    raw_data_corrigida = get_time_entries_corrigido() # CHAMADA SEM ARGUMENTO
     
     if not raw_data_corrigida:
         print(" Nenhum dado para exportar. Verifique permissões da API Key.")
@@ -262,9 +271,24 @@ def get_work_packages_for_export(date_range, use_date_filter=True):
     users = get_users()
     
     resultado = []
+    
+    # --- OTIMIZAÇÃO ---
+    # Cache para armazenar custos de WPs já buscados
+    wp_cost_cache = {} 
+    total_entries = len(raw_data_corrigida)
+    print(f"\nIniciando processamento de {total_entries} registros...")
+    # ------------------
+    
     # O loop agora itera sobre os dados corretos (lançamentos de tempo).
-    for entry in raw_data_corrigida:
+    # Adicionado 'enumerate' para podermos mostrar o progresso
+    for i, entry in enumerate(raw_data_corrigida):
         
+        # --- MOSTRAR PROGRESSO ---
+        # Mostra o progresso a cada 50 itens ou no último item
+        if (i + 1) % 50 == 0 or (i + 1) == total_entries:
+            print(f"  - Processando registro {i + 1} / {total_entries}...")
+        # -------------------------
+
         links = entry.get("_links", {})
         
         data_correta = entry.get("spentOn", "")
@@ -274,14 +298,22 @@ def get_work_packages_for_export(date_range, use_date_filter=True):
         subject = task_data.get("title", "N/A")
         pacote_trabalho = f"Task #{task_number}: {subject}"
         
-        # --- LÓGICA PARA BUSCAR OS CUSTOS ---
-        custo_total = "0,00 BRL"  # Define um valor padrão
+        custo_total = "0,00 BRL"
+        
         if task_number:
-            # Chama a nova função para obter detalhes do work package
-            wp_details = get_work_package_details(task_number)
-            if wp_details:
-                # Extrai o 'overallCosts' do JSON retornado
-                custo_total = wp_details.get("overallCosts", "0,00 BRL")
+            # --- LÓGICA DE CACHE OTIMIZADA ---
+            if task_number in wp_cost_cache:
+                # 1. Se o custo já está no cache, usa ele
+                custo_total = wp_cost_cache[task_number]
+            else:
+                # 2. Se não está, busca na API
+                wp_details = get_work_package_details(task_number)
+                if wp_details:
+                    custo_total = wp_details.get("overallCosts", "0,00 BRL")
+                
+                # 3. Salva o resultado no cache (mesmo se falhou, salva "0,00 BRL")
+                wp_cost_cache[task_number] = custo_total
+            # ---------------------------------
 
         comentario_data = entry.get("comment", {})
         comentario = comentario_data.get("raw", "Sem comentário") if isinstance(comentario_data, dict) else ""
@@ -308,19 +340,20 @@ def get_work_packages_for_export(date_range, use_date_filter=True):
         resultado.append(registro)
     
     if resultado:
-        print(f" {len(resultado)} registros prontos para exportação.")
+        print(f"\n {len(resultado)} registros prontos para exportação.")
     
     return resultado
 
 # Bloco de execução para teste
 if __name__ == '__main__':
     # Define o período desejado
-    periodo = parse_month_to_range("10/2025")
+    # periodo = parse_month_to_range("10/2025") # REMOVIDA LÓGICA DE DATA
     
     # Chama a função principal (que agora tem a lógica corrigida)
-    dados_finais = get_work_packages_for_export(periodo)
+    dados_finais = get_work_packages_for_export() # CHAMADA SEM ARGUMENTO
     
     # Mostra uma prévia do resultado
     if dados_finais:
+        print("\n--- PRÉVIA DOS 5 PRIMEIROS REGISTROS ---")
         for item in dados_finais[:5]:
             print(json.dumps(item, indent=2, ensure_ascii=False))
