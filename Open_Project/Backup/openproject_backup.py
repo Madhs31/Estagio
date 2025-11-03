@@ -3,165 +3,256 @@ import json
 import datetime
 import os
 import shutil
+import time
 from typing import Dict, List, Optional, Any
+from requests.auth import HTTPBasicAuth
 
 # ================= CONFIGURAÇÕES =================
-OPENPROJECT_URL = "http://localhost:8080/api/v3"  # Incluindo /api/v3
-API_KEY = "082b0167b517e464b3629e06a6a35e687aae05b8bc028780b93e94df730d2c83"  # Chave da API
+OPENPROJECT_URL = ""
+API_KEY = ""
 BACKUP_DIR = "openproject_backups"
 VERIFY_SSL = False
-BACKUP_SETTINGS = {
-    'include_projects': True,
-    'include_work_packages': True,
-    'include_users': True,
-    'max_retries': 3,
-    'work_package_filters': None
-}
+MAX_RETRIES = 3
+RETRY_DELAY = 5
 
 # ================= CLASSE PRINCIPAL =================
 class OpenProjectBackup:
     def __init__(self, base_url: str, api_key: str, verify_ssl: bool = True):
         self.base_url = base_url.rstrip('/')
-        self.api_key = api_key
+        self.api_v3_url = f"{self.base_url}/api/v3"
+        self.auth = HTTPBasicAuth('apikey', api_key)
         self.verify_ssl = verify_ssl
-        # Usando X-API-Key para autenticação
-        self.headers = {
-            'Content-Type': 'application/json',
-            'X-API-Key': api_key
-        }
+        self.headers = {'Content-Type': 'application/json'}
+
+        if not VERIFY_SSL:
+            import urllib3
+            urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+    def _make_request(self, method: str, url: str, **kwargs) -> Optional[requests.Response]:
+        for attempt in range(MAX_RETRIES):
+            try:
+                response = requests.request(
+                    method, url, auth=self.auth, headers=self.headers,
+                    verify=self.verify_ssl, **kwargs
+                )
+                if response.status_code == 404:
+                    print(f"AVISO: Endpoint não encontrado (404): {url}. O recurso pode não existir ou o módulo estar desabilitado.")
+                    return None
+                response.raise_for_status()
+                return response
+            except requests.exceptions.RequestException as e:
+                print(f"Erro na tentativa {attempt + 1}/{MAX_RETRIES} para {url}: {e}")
+                if attempt + 1 == MAX_RETRIES:
+                    print(f"Falha ao acessar o endpoint {url} após {MAX_RETRIES} tentativas.")
+                    return None
+                time.sleep(RETRY_DELAY)
+        return None
 
     def _get_paginated_collection(self, endpoint: str, params: Optional[Dict[str, Any]] = None) -> List[Dict]:
         collection = []
-        offset = 0
+        offset = 1
         page_size = 100
         current_params = params.copy() if params else {}
 
         while True:
             current_params.update({'offset': offset, 'pageSize': page_size})
-            try:
-                url = f"{self.base_url}{endpoint}" if not endpoint.startswith(self.base_url) else endpoint
-                response = requests.get(url, headers=self.headers, params=current_params, verify=self.verify_ssl)
-
-                if response.status_code == 401:
-                    print("Erro 401: Token inválido ou sem permissão.")
-                    break
-                if response.status_code != 200:
-                    print(f"Erro de paginação {endpoint} (offset {offset}): {response.status_code}")
-                    print(f"Resposta: {response.text[:500]}")
-                    break
-
-                data = response.json()
-                elements = data.get('_embedded', {}).get('elements', [])
-                if not elements:
-                    break
-                collection.extend(elements)
-                if len(elements) < page_size:
-                    break
-                offset += page_size
-            except requests.exceptions.RequestException as e:
-                print(f"Erro ao acessar {endpoint}: {e}")
-                break
+            response = self._make_request('get', f"{self.api_v3_url}{endpoint}", params=current_params)
+            
+            if not response: break
+            data = response.json()
+            elements = data.get('_embedded', {}).get('elements', [])
+            if not elements: break
+            
+            collection.extend(elements)
+            if len(elements) < page_size: break
+            offset += 1
         return collection
 
-    def test_connection(self) -> bool:
-        try:
-            r = requests.get(f"{self.base_url}/projects", headers=self.headers, verify=self.verify_ssl)
-            print(f"Status code: {r.status_code}")
-            print(f"Resposta: {r.text[:500]}")
-            return r.status_code == 200
-        except Exception as e:
-            print(f"Erro de conexão: {e}")
-            return False
+    def get_full_work_package(self, wp_id: int) -> Optional[Dict]:
+        response = self._make_request('get', f"{self.api_v3_url}/work_packages/{wp_id}")
+        if not response: return None
+        
+        wp_data = response.json()
+        
+        activities_response = self._make_request('get', f"{self.api_v3_url}/work_packages/{wp_id}/activities")
+        if activities_response:
+            if '_embedded' not in wp_data:
+                wp_data['_embedded'] = {}
+            wp_data['_embedded']['activities'] = activities_response.json().get('_embedded', {}).get('elements', [])
+        
+        return wp_data
 
-    def get_projects(self) -> List[Dict]:
-        print("Buscando projetos...")
-        return self._get_paginated_collection("/projects")
+    def download_attachment(self, attachment: Dict, download_path: str):
+        content_url = f"{self.base_url}{attachment['_links']['self']['href']}/content"
+        file_name = attachment.get('fileName', f"attachment_{attachment['id']}")
+        file_path = os.path.join(download_path, f"{attachment['id']}_{file_name}")
 
-    def get_project_details(self, project_id: int) -> Dict:
-        project_data = {}
-        try:
-            r = requests.get(f"{self.base_url}/projects/{project_id}", headers=self.headers, verify=self.verify_ssl)
-            if r.status_code == 200:
-                project_data['details'] = r.json()
-            else:
-                print(f"Erro detalhes projeto {project_id}: {r.status_code}")
-        except Exception as e:
-            print(f"Erro projeto {project_id}: {e}")
+        response = self._make_request('get', content_url)
+        if response and not os.path.exists(file_path):
+            with open(file_path, 'wb') as f: f.write(response.content)
+            print(f"   -> Anexo '{file_name}' baixado.")
+        elif os.path.exists(file_path):
+            print(f"   -> Anexo '{file_name}' já existe, pulando.")
 
-        project_data['work_packages'] = self._get_paginated_collection(f"/projects/{project_id}/work_packages")
-        project_data['versions'] = self._get_paginated_collection(f"/projects/{project_id}/versions")
-        project_data['members'] = self._get_paginated_collection(f"/projects/{project_id}/members")
-
-        return project_data
-
-    def get_work_packages(self, filters: Optional[List[Dict]] = None) -> List[Dict]:
-        params = {}
-        if filters:
-            params['filters'] = json.dumps(filters)
-        print("Buscando Work Packages...")
-        return self._get_paginated_collection("/work_packages", params=params)
-
-    def get_users(self) -> List[Dict]:
-        print("Buscando usuários...")
-        return self._get_paginated_collection("/users")
-
-    def create_backup(self, backup_dir: str = "backups", wp_filters: Optional[List[Dict]] = None) -> str:
+    def create_backup(self) -> Optional[str]:
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        temp_backup_path = os.path.join(backup_dir, f"openproject_backup_{timestamp}_temp")
-        os.makedirs(temp_backup_path, exist_ok=True)
+        temp_backup_path = os.path.join(BACKUP_DIR, f"backup_{timestamp}_temp")
+        
+        try:
+            # --- MODIFICADO: Adicionado 'budgets' ---
+            paths = {
+                "base": temp_backup_path, 
+                "projects": os.path.join(temp_backup_path, "projects"),
+                "work_packages": os.path.join(temp_backup_path, "work_packages"),
+                "attachments": os.path.join(temp_backup_path, "attachments"),
+                "users": os.path.join(temp_backup_path, "users"),
+                "schemas": os.path.join(temp_backup_path, "schemas"),
+                "time_entries": os.path.join(temp_backup_path, "time_entries"),
+                "budgets": os.path.join(temp_backup_path, "budgets"),
+            }
+            for path in paths.values(): os.makedirs(path, exist_ok=True)
 
-        print("Iniciando backup...")
+            print("\nIniciando backup completo...")
+            total_steps = 7 # --- MODIFICADO ---
 
-        backup_data = {
-            'metadata': {
-                'backup_date': datetime.datetime.now().isoformat(),
-                'openproject_url': self.base_url,
-                'backup_version': '1.0'
-            },
-            'projects': self.get_projects(),
-            'users': self.get_users(),
-            'work_packages_filtered': self.get_work_packages(filters=wp_filters)
-        }
+            # 1. Backup de Schemas e Configurações Globais
+            print(f"\n[1/{total_steps}] Fazendo backup das configurações globais (schemas, roles, groups...)...")
+            
+            # --- MODIFICADO: Adicionado '/cost_types' ---
+            endpoints_to_save = [
+                "/types", "/statuses", "/priorities", # Schemas básicos
+                "/roles", "/custom_fields", "/groups", # Configurações de admin
+                "/queries", "/news", # Dados globais
+                "/cost_types" # Configuração de custos
+            ]
+            
+            for endpoint in endpoints_to_save:
+                schema_name = endpoint.strip('/')
+                data = self._get_paginated_collection(endpoint)
+                if data:
+                    with open(os.path.join(paths["schemas"], f"{schema_name}.json"), 'w', encoding='utf-8') as f:
+                        json.dump(data, f, indent=2, ensure_ascii=False)
+                    print(f"- {schema_name.capitalize()} salvos ({len(data)} itens).")
 
-        main_file = os.path.join(temp_backup_path, 'backup_data.json')
-        with open(main_file, 'w', encoding='utf-8') as f:
-            json.dump(backup_data, f, indent=2, ensure_ascii=False)
+            # 2. Backup de Usuários
+            print(f"\n[2/{total_steps}] Fazendo backup dos usuários...")
+            users = self._get_paginated_collection("/users")
+            with open(os.path.join(paths["users"], "users.json"), 'w', encoding='utf-8') as f:
+                json.dump(users, f, indent=2, ensure_ascii=False)
+            print(f"- Total de {len(users)} usuários salvos.")
+            
+            # 3. Backup de Projetos e sub-recursos
+            print(f"\n[3/{total_steps}] Fazendo backup dos projetos...")
+            projects = self._get_paginated_collection("/projects")
+            print(f"- {len(projects)} projetos encontrados.")
+            for project in projects:
+                project_id, project_identifier = project['id'], project['identifier']
+                print(f"-- Processando projeto: {project['name']} (ID: {project_id})")
+                
+                project_dir = os.path.join(paths["projects"], f"{project_id}_{project_identifier}")
+                os.makedirs(project_dir, exist_ok=True)
 
-        projects_dir = os.path.join(temp_backup_path, 'projects')
-        os.makedirs(projects_dir, exist_ok=True)
+                details_resp = self._make_request('get', f"{self.api_v3_url}/projects/{project_id}")
+                if not details_resp: continue
+                
+                project_details = details_resp.json()
+                
+                if '_embedded' not in project_details:
+                    project_details['_embedded'] = {}
+                
+                # Salva sub-recursos do projeto
+                project_details['_embedded']['memberships'] = self._get_paginated_collection(f"/projects/{project_id}/memberships")
+                project_details['_embedded']['versions'] = self._get_paginated_collection(f"/projects/{project_id}/versions")
+                project_details['_embedded']['categories'] = self._get_paginated_collection(f"/projects/{project_id}/categories")
+                
+                # --- ADICIONADO: Wiki ---
+                print(f"   ... salvando Wiki pages")
+                project_details['_embedded']['wiki_pages'] = self._get_paginated_collection(f"/projects/{project_id}/wiki_pages")
+                
+                # --- ADICIONADO: Fóruns e Mensagens ---
+                print(f"   ... salvando Fóruns e Mensagens")
+                forums = self._get_paginated_collection(f"/projects/{project_id}/forums")
+                forums_with_messages = []
+                for forum in forums:
+                    forum_id = forum['id']
+                    print(f"     -> salvando mensagens do fórum: {forum.get('name')}")
+                    # A API de mensagens pode ser paginada, então usamos a função helper
+                    forum['messages'] = self._get_paginated_collection(f"/forums/{forum_id}/messages")
+                    forums_with_messages.append(forum)
+                    
+                project_details['_embedded']['forums_with_messages'] = forums_with_messages
+                # --- FIM ADIÇÃO ---
+                
+                with open(os.path.join(project_dir, "project_details.json"), 'w', encoding='utf-8') as f:
+                    json.dump(project_details, f, indent=2, ensure_ascii=False)
 
-        for project in backup_data['projects']:
-            project_id = project['id']
-            print(f"Backup projeto: {project['name']} (ID {project_id})")
-            details = self.get_project_details(project_id)
-            project_file = os.path.join(projects_dir, f"project_{project_id}.json")
-            with open(project_file, 'w', encoding='utf-8') as f:
-                json.dump(details, f, indent=2, ensure_ascii=False)
+            # 4. Backup de Work Packages e Anexos
+            print(f"\n[4/{total_steps}] Fazendo backup dos pacotes de trabalho...")
+            all_wps = self._get_paginated_collection("/work_packages")
+            print(f"- Encontrados {len(all_wps)} pacotes de trabalho. Buscando detalhes...")
+            
+            for i, wp in enumerate(all_wps):
+                print(f"   Processando WP {wp['id']} ({i+1}/{len(all_wps)})...")
+                wp_details = self.get_full_work_package(wp['id'])
+                if wp_details:
+                    with open(os.path.join(paths["work_packages"], f"wp_{wp['id']}.json"), 'w', encoding='utf-8') as f:
+                        json.dump(wp_details, f, indent=2, ensure_ascii=False)
+                    
+                    attachments = wp_details.get('_embedded', {}).get('attachments', {}).get('elements', [])
+                    if attachments:
+                        att_dir = os.path.join(paths["attachments"], str(wp['id']))
+                        os.makedirs(att_dir, exist_ok=True)
+                        for attachment in attachments: self.download_attachment(attachment, att_dir)
 
-        zip_file = shutil.make_archive(os.path.join(backup_dir, f"openproject_backup_{timestamp}"), 'zip', temp_backup_path)
-        shutil.rmtree(temp_backup_path)
-        print(f"Backup concluído: {zip_file}")
-        return zip_file
+            # 5. Backup de Registros de Tempo
+            print(f"\n[5/{total_steps}] Fazendo backup dos registros de tempo...")
+            time_entries = self._get_paginated_collection("/time_entries")
+            with open(os.path.join(paths["time_entries"], "time_entries.json"), 'w', encoding='utf-8') as f:
+                json.dump(time_entries, f, indent=2, ensure_ascii=False)
+            print(f"- Total de {len(time_entries)} registros de tempo salvos.")
+
+            # --- NOVO PASSO ---
+            # 6. Backup de Orçamentos (Budgets)
+            print(f"\n[6/{total_steps}] Fazendo backup dos orçamentos (budgets)...")
+            budgets = self._get_paginated_collection("/budgets")
+            if budgets:
+                with open(os.path.join(paths["budgets"], "budgets.json"), 'w', encoding='utf-8') as f:
+                    json.dump(budgets, f, indent=2, ensure_ascii=False)
+                print(f"- Total de {len(budgets)} orçamentos salvos.")
+            else:
+                print("- Módulo de Orçamentos não habilitado ou sem dados.")
+            # --- FIM DO NOVO PASSO ---
+
+            # 7. Compactando
+            print(f"\n[7/{total_steps}] Compactando arquivos de backup...")
+            zip_filename = os.path.join(BACKUP_DIR, f"openproject_backup_{timestamp}")
+            shutil.make_archive(zip_filename, 'zip', paths["base"])
+            print(f"Backup concluído: {zip_filename}.zip")
+            return f"{zip_filename}.zip"
+
+        finally:
+            if os.path.exists(temp_backup_path):
+                shutil.rmtree(temp_backup_path)
+                print("Pasta temporária removida.")
+        return None
 
 # ================= FUNÇÃO PRINCIPAL =================
 def main():
     if not OPENPROJECT_URL or not API_KEY:
-        print("Configure OPENPROJECT_URL e API_KEY no script")
+        print("ERRO: Configure as variáveis OPENPROJECT_URL e API_KEY no início do script.")
         return
 
+    os.makedirs(BACKUP_DIR, exist_ok=True)
     backup_client = OpenProjectBackup(OPENPROJECT_URL, API_KEY, verify_ssl=VERIFY_SSL)
+    
+    backup_file = backup_client.create_backup()
 
-    print("Testando conexão...")
-    if not backup_client.test_connection():
-        print("Falha na conexão com OpenProject!")
-        return
-    print("Conexão OK!")
-
-    wp_filters = BACKUP_SETTINGS.get('work_package_filters')
-    backup_file = backup_client.create_backup(BACKUP_DIR, wp_filters)
-
-    size_mb = os.path.getsize(backup_file) / (1024*1024)
-    print(f"Backup salvo: {backup_file} ({size_mb:.2f} MB)")
+    if backup_file and os.path.exists(backup_file):
+        size_mb = os.path.getsize(backup_file) / (1024 * 1024)
+        print(f"\n✅ Backup finalizado com sucesso!")
+        print(f"Arquivo salvo em: {backup_file} ({size_mb:.2f} MB)")
+    else:
+        print("\nOcorreu um erro e o backup não pôde ser concluído.")
 
 if __name__ == "__main__":
     main()
