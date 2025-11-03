@@ -2,8 +2,8 @@ import requests
 import base64
 
 # 🔑 Substitua pelo seu token de API pessoal (copiado de /my/access_token)
-API_KEY = "9bd0b79029b80fa89942e84791c52021938a645bce01bc27321f483599151d46"
-URL = "https://opt-openproject.eastus.cloudapp.azure.com/api/v3/projects"  # Exemplo de endpoint da API
+API_KEY = "c250944e08982a7af7211376d7d46712d6049f41a409c27065302ad28ce87406"
+URL = "http://localhost:8080/api/v3"  # Exemplo de endpoint da API
 
 # Cria o cabeçalho Authorization no formato Basic base64("apikey:api_token")
 token_bytes = f"apikey:{API_KEY}".encode("utf-8")
